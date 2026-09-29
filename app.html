@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ErgMath - calculator</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #14161c; color: #eceff5; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+  main { max-width: 720px; padding: 32px 20px 48px; width: 100%; box-sizing: border-box; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; }
+  p.sub { color: #a8b0c4; margin: 0 0 20px; }
+  .card { background: #1c1f28; border: 1px solid #303547; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+  label { display: block; color: #98a0b5; font-size: 0.82rem; margin-bottom: 4px; }
+  input, select { width: 100%; box-sizing: border-box; background: #14161c; border: 1px solid #3a4057; color: #eceff5; border-radius: 8px; padding: 9px 10px; font-size: 0.95rem; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .presets button { background: #242936; color: #ddd6c8; border: 1px solid #3a4057; border-radius: 999px; padding: 7px 14px; font-size: 0.85rem; cursor: pointer; }
+  .presets button:hover { background: #303747; }
+  .out { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .metric { background: #14161c; border: 1px solid #303547; border-radius: 10px; padding: 12px 14px; }
+  .metric .v { font-size: 1.3rem; font-weight: 700; color: #eabb83; }
+  .metric .k { color: #98a0b5; font-size: 0.78rem; margin-top: 2px; }
+  .note { color: #8a91a3; font-size: 0.82rem; line-height: 1.5; margin-top: 10px; }
+  a.back { color: #eabb83; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>&#128675; ErgMath</h1>
+  <p class="sub">Rowing erg calculator. Split in; honest numbers out.</p>
+  <div class="presets">
+    <button data-p="steady">Steady 30 minutes</button>
+    <button data-p="twok">2k test at 1:50</button>
+    <button data-p="hour">Hour piece</button>
+    <button data-p="beginner">New rower</button>
+  </div>
+  <div class="card">
+    <div class="grid">
+      <div><label>Split (min per 500m)</label><input id="splitMin" type="number" value="1" min="0"></div>
+      <div><label>Split (sec part)</label><input id="splitSec" type="number" value="55" min="0" step="0.1"></div>
+      <div><label>Your weight (lb)</label><input id="weightLb" type="number" value="176" min="80"></div>
+      <div><label>Sex (for bands)</label><select id="sex"><option value="male" selected>Male</option><option value="female">Female</option></select></div>
+      <div><label>Damper setting (1-10)</label><input id="damper" type="number" value="5" min="1" max="10"></div>
+      <div><label>Piece length (min)</label><input id="minutes" type="number" value="30" min="1"></div>
+      <div><label>Target distance (m)</label><input id="meters" type="number" value="2000" min="100" step="100"></div>
+      <div><label>Steady piece type</label><select id="piece"><option value="30min" selected>30 min</option><option value="5k">5k</option><option value="60min">60 min</option></select></div>
+    </div>
+  </div>
+  <div class="out">
+    <div class="metric"><div class="v" id="o-watts">-</div><div class="k">Watts at this split</div></div>
+    <div class="metric"><div class="v" id="o-wkg">-</div><div class="k">Watts per kilo</div></div>
+    <div class="metric"><div class="v" id="o-band">-</div><div class="k">Level band</div></div>
+    <div class="metric"><div class="v" id="o-dist">-</div><div class="k">Distance in piece (m)</div></div>
+    <div class="metric"><div class="v" id="o-time">-</div><div class="k">Time for target (min)</div></div>
+    <div class="metric"><div class="v" id="o-kcal">-</div><div class="k">Calories per hour</div></div>
+    <div class="metric"><div class="v" id="o-drag">-</div><div class="k">Drag factor</div></div>
+    <div class="metric"><div class="v" id="o-steady">-</div><div class="k">Steady split for piece</div></div>
+  </div>
+  <p class="note" id="o-verdicts"></p>
+  <p class="note">The watt formula is the Concept2 standard. Bands are rough guides for mid-weight open rowers, not rankings - a 2k is a test day, not a personality.</p>
+  <p><a class="back" href="index.html">&larr; Back to ErgMath</a></p>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var ids = ['splitMin','splitSec','weightLb','sex','damper','minutes','meters','piece'];
+  function num(id) { var v = parseFloat(document.getElementById(id).value); return isFinite(v) ? v : 0; }
+  function compute() {
+    if (typeof ErgMath === 'undefined') return;
+    var split = num('splitMin') * 60 + num('splitSec');
+    var watts = ErgMath.wattsFromSplit(split);
+    var wkg = ErgMath.wattsPerKg(watts, num('weightLb'));
+    var sex = document.getElementById('sex').value;
+    var band = ErgMath.wattBand(watts, sex);
+    var dist = ErgMath.distanceInMinutes(split, num('minutes'));
+    var time = ErgMath.timeForDistance(split, num('meters'));
+    var kcal = ErgMath.kcalPerHour(watts, num('weightLb'));
+    var drag = ErgMath.dragFromDamper(num('damper'));
+    var steady = ErgMath.steadySplit(split, document.getElementById('piece').value);
+    document.getElementById('o-watts').textContent = watts + ' W';
+    document.getElementById('o-wkg').textContent = wkg + ' W/kg';
+    document.getElementById('o-band').textContent = band;
+    document.getElementById('o-dist').textContent = dist.toLocaleString() + ' m';
+    document.getElementById('o-time').textContent = (time / 60).toFixed(1) + ' min';
+    document.getElementById('o-kcal').textContent = kcal + ' kcal/h';
+    document.getElementById('o-drag').textContent = drag;
+    document.getElementById('o-steady').textContent = ErgMath.formatSplit(steady) + ' /500m';
+    document.getElementById('o-verdicts').textContent =
+      'A 2k at this split runs ' + (ErgMath.predicted2k(split) / 60).toFixed(1) + ' min. Drag: ' +
+      ErgMath.dragVerdict(drag) + '.';
+  }
+  var presets = {
+    steady: {splitMin:2, splitSec:5, weightLb:176, sex:'male', damper:5, minutes:30, meters:2000, piece:'30min'},
+    twok: {splitMin:1, splitSec:50, weightLb:190, sex:'male', damper:6, minutes:7, meters:2000, piece:'5k'},
+    hour: {splitMin:2, splitSec:15, weightLb:150, sex:'female', damper:4, minutes:60, meters:2000, piece:'60min'},
+    beginner: {splitMin:2, splitSec:30, weightLb:160, sex:'female', damper:4, minutes:20, meters:2000, piece:'30min'}
+  };
+  Array.prototype.forEach.call(document.querySelectorAll('.presets button'), function (b) {
+    b.addEventListener('click', function () {
+      var p = presets[b.getAttribute('data-p')];
+      if (!p) return;
+      Object.keys(p).forEach(function (k) { document.getElementById(k).value = p[k]; });
+      compute();
+    });
+  });
+  ids.forEach(function (id) {
+    document.getElementById(id).addEventListener('input', compute);
+    document.getElementById(id).addEventListener('change', compute);
+  });
+  compute();
+})();
+</script>
+</body>
+</html>
